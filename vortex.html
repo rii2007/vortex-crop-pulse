@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Market Price Pulse</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    
+    <style>
+        /* BASE THEME STYLES */
+        :root {
+            --primary-green: #0b7a44;
+            --light-green: #e6f4ea;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --border-light: #e2e8f0;
+            --bg-light: #f8fafc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        html { scroll-behavior: smooth; }
+        body { background-color: var(--bg-light); color: var(--text-dark); line-height: 1.5; }
+        .container { max-width: 1250px; margin: 0 auto; padding: 0 1.5rem; }
+        
+        /* HEADER & NAVIGATION */
+        header { background: #ffffff; border-bottom: 1px solid var(--border-light); position: sticky; top: 0; z-index: 1000; }
+        .header-wrap { display: flex; align-items: center; justify-content: space-between; height: 70px; }
+        .logo-area { display: flex; align-items: center; gap: 0.5rem; text-decoration: none;}
+        .logo-icon { color: var(--primary-green); font-size: 28px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--primary-green); border-radius: 50%; width: 40px; height: 40px;}
+        .logo-text h1 { font-size: 1.15rem; font-weight: 700; color: var(--primary-green); line-height: 1.1; }
+        .logo-text p { font-size: 0.7rem; color: var(--text-gray); font-weight: 500; }
+
+        .main-nav { display: none; }
+        @media(min-width: 900px) {
+            .main-nav { display: flex; gap: 2rem; align-items: center; }
+            .main-nav a { text-decoration: none; color: var(--text-dark); font-weight: 500; font-size: 0.95rem; padding: 1.5rem 0; border-bottom: 3px solid transparent; transition: all 0.2s;}
+            .main-nav a:hover, .main-nav a.active { color: var(--primary-green); border-bottom-color: var(--primary-green); }
+        }
+        
+        /* LANGUAGE BUTTON DROPDOWN */
+        .lang-container { position: relative; }
+        .lang-btn { background: var(--primary-green); color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 500; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+        .lang-btn:hover { background: #096336; }
+        .lang-dropdown { display: none; position: absolute; right: 0; top: 110%; background: white; border: 1px solid var(--border-light); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); width: 150px; z-index: 2000; overflow-y: auto; }
+        .lang-dropdown.show { display: block; }
+        .lang-dropdown button { display: block; width: 100%; text-align: left; padding: 0.75rem 1rem; background: none; border: none; font-size: 0.875rem; cursor: pointer; color: #334155; }
+        .lang-dropdown button:hover, .lang-dropdown button.active { background: var(--light-green); color: var(--primary-green); font-weight: 600; }
+
+        /* HERO LAYOUT */
+        .hero { 
+            background: linear-gradient(to right, rgba(240, 249, 244, 0.95) 40%, rgba(255, 255, 255, 0) 100%), url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=1600&q=80') center right/cover no-repeat;
+            padding: 4rem 0 10rem 0;
+        }
+        .hero-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; align-items: center; }
+        @media (min-width: 900px) { .hero-grid { grid-template-columns: 1.2fr 1fr; } }
+        
+        .hero-left h2 { font-size: 2.75rem; font-weight: 800; color: #111827; line-height: 1.2; margin-bottom: 1rem; letter-spacing: -0.02em;}
+        .hero-left h2 span { color: var(--primary-green); }
+        .hero-left > p { color: #374151; font-size: 1.1rem; margin-bottom: 2rem; max-width: 500px; line-height: 1.6; font-weight: 500;}
+        
+        /* Hero Features */
+        .hero-features { display: flex; gap: 1.5rem; margin-bottom: 2.5rem; max-width: 600px; flex-wrap: wrap;}
+        .feature { display: flex; gap: 0.75rem; align-items: flex-start; flex: 1; min-width: 160px;}
+        .feature .f-icon { background: var(--light-green); color: var(--primary-green); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;}
+        .feature h4 { font-size: 0.9rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.2rem;}
+        .feature p { font-size: 0.75rem; color: var(--text-gray); line-height: 1.3;}
+
+        .cta-btn { background: var(--primary-green); color: white; border: none; padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 600; border-radius: 0.5rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+        .cta-btn:hover { background: #096336; }
+
+        /* HIGHLIGHT WIDGET CARD (WITH FADE ANIMATION SUPPORT) */
+        .hero-right { display: flex; justify-content: flex-end; }
+        .hero-card { background: rgba(21, 128, 61, 0.95); backdrop-filter: blur(4px); color: white; padding: 1.5rem 2rem; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid rgba(255,255,255,0.2); max-width: 320px; width: 100%; text-align: left; position: relative;}
+        
+        .hero-card-content { transition: opacity 0.4s ease-in-out; opacity: 1; }
+        .hero-card-content.fade-out { opacity: 0; }
+
+        .card-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.5rem; opacity: 0.9; }
+        .card-badge span.icon-circle { background: white; color: green; border-radius: 50%; width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;}
+        .hero-card h3 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.2rem; }
+        .card-price { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; display: flex; align-items: baseline; gap: 0.3rem;}
+        .card-price span.unit { font-size: 0.9rem; font-weight: 400; opacity: 0.9; }
+        .hero-card > p { font-size: 0.85rem; opacity: 0.9; font-weight: 500; }
+
+        /* DATA SECTION (TABLE & FILTERS) */
+        .main-content { margin-top: -6rem; position: relative; z-index: 10; margin-bottom: 3rem;}
+        .data-card { background: white; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid var(--border-light); }
+        
+        .data-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; border-bottom: 1px solid var(--border-light); flex-wrap: wrap; gap: 1rem;}
+        .data-title { display: flex; align-items: center; gap: 1rem; }
+        .data-title h2 { font-size: 1.25rem; font-weight: 700; color: var(--text-dark); }
+        .data-title p { font-size: 0.85rem; color: var(--text-gray); display: flex; align-items: center; gap: 0.5rem; }
+        .data-title p::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--primary-green); border-radius: 50%; }
+
+        .filter-controls { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+        .filter-item { border: 1px solid var(--border-light); border-radius: 0.5rem; padding: 0.4rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; background: white; }
+        .filter-item select { border: none; outline: none; background: transparent; font-size: 0.9rem; font-weight: 500; color: var(--text-dark); cursor: pointer; padding-right: 0.5rem;}
+        .filter-icon { color: var(--primary-green); font-size: 1rem; }
+        
+        .btn-outline { background: transparent; border: 1px solid var(--primary-green); color: var(--primary-green); padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s;}
+        .btn-outline:hover { background: var(--light-green); }
+        .btn-mic { padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border-light); background: var(--bg-light); cursor: pointer; transition: 0.2s; }
+        .btn-mic:hover { background: #e2e8f0; }
+        .voice-btn-recording { background-color: #fca5a5 !important; border-color: #ef4444 !important; color: #7f1d1d !important; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
+        /* DATA TABLE */
+        .table-overflow { overflow-x: auto; position: relative; }
+        table { width: 100%; border-collapse: collapse; text-align: left; min-width: 900px; }
+        th { background: #fdfdfd; padding: 1.2rem 2rem; font-size: 0.8rem; font-weight: 600; color: var(--text-dark); border-bottom: 2px solid var(--border-light); white-space: nowrap;}
+        td { padding: 1.25rem 2rem; font-size: 0.95rem; border-bottom: 1px solid var(--border-light); font-weight: 500; color: #334155;}
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) { background-color: #fcfcfc; }
+        tr:hover td { background-color: var(--bg-light); }
+        
+        .modal-price-col { font-weight: 700 !important; color: var(--primary-green) !important; font-size: 1.05rem !important; }
+        .badge-best { background: #fde047; color: #854d0e; padding: 0.2rem 0.6rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 700; margin-left: 0.75rem; display: inline-block;}
+        .badge-reco { background: var(--light-green); color: var(--primary-green); padding: 0.3rem 0.75rem; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;}
+        .trend-up { color: var(--primary-green); font-weight: 600; }
+        .trend-down { color: #ef4444; font-weight: 600; }
+        
+        .data-footer { display: flex; justify-content: space-between; padding: 1rem 2rem; background: #fdfdfd; border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-gray); }
+        .data-footer div { display: flex; align-items: center; gap: 0.5rem; }
+        .table-spinner { display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.8); align-items: center; justify-content: center; font-weight: 700; color: var(--primary-green); font-size: 1.1rem; z-index: 50;}
+        .table-spinner.show { display: flex; }
+
+        /* MAP AREA */
+        .map-section { margin-top: 2rem; }
+        .map-box { background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05); }
+        .map-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .map-header h3 { font-size: 1.1rem; font-weight: 700; }
+        .map-visual-container { background: var(--bg-light); height: 350px; border-radius: 8px; border: 1px solid var(--border-light); z-index: 1;}
+
+        /* COMPARE MARKETS TOOL (NEW) */
+        #compare-section { padding: 4rem 0; background: white; margin-top: 2rem; border-top: 1px solid var(--border-light); }
+        .compare-header { text-align: center; margin-bottom: 2.5rem; }
+        .compare-header h2 { font-size: 2rem; color: var(--text-dark); margin-bottom: 0.5rem; }
+        .compare-header p { color: var(--text-gray); font-size: 1.1rem; }
+        .compare-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        @media(min-width: 768px) { .compare-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .comp-card { border: 2px solid var(--border-light); border-radius: 12px; padding: 2rem; background: var(--bg-light); text-align: center; transition: transform 0.2s, box-shadow 0.2s; position: relative;}
+        .comp-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px -10px rgba(0,0,0,0.1); border-color: var(--primary-green);}
+        .comp-card h3 { color: var(--primary-green); font-size: 1.5rem; margin-bottom: 0.2rem; }
+        .comp-card > p { color: var(--text-gray); font-size: 0.9rem; margin-bottom: 1.5rem; }
+        .comp-price { font-size: 2.5rem; font-weight: 800; color: var(--text-dark); margin-bottom: 2rem; }
+        .comp-price span { font-size: 1rem; font-weight: 500; color: var(--text-gray); }
+        
+        .comp-stat { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding: 0.8rem 0; font-size: 0.95rem; }
+        .comp-stat:last-child { border-bottom: none; }
+        .comp-stat span { color: var(--text-gray); font-weight: 500;}
+        .comp-stat strong { color: var(--text-dark); font-weight: 700;}
+        .comp-badge-top { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #fde047; color: #854d0e; padding: 0.3rem 1rem; border-radius: 20px; font-weight: 800; font-size: 0.8rem; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}
+        .comp-badge-alt { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--text-dark); color: white; padding: 0.3rem 1rem; border-radius: 20px; font-weight: 700; font-size: 0.8rem; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}
+
+        /* ABOUT US MODAL */
+        .about-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 3000; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+        .about-modal-overlay.show { display: flex; animation: fadeIn 0.3s ease; }
+        .about-modal-content { background: white; max-width: 750px; width: 100%; border-radius: 12px; padding: 2.5rem; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+        .close-modal { position: absolute; top: 1.25rem; right: 1.5rem; font-size: 2rem; cursor: pointer; color: var(--text-gray); transition: 0.2s; line-height: 1; }
+        .close-modal:hover { color: #ef4444; }
+        
+        .about-modal-content h2 { color: var(--primary-green); font-size: 2rem; margin-bottom: 1rem; font-weight: 800; }
+        .about-modal-content h3 { color: var(--text-dark); font-size: 1.2rem; margin: 1.5rem 0 0.5rem 0; font-weight: 700;}
+        .about-modal-content p { color: var(--text-gray); margin-bottom: 1rem; line-height: 1.7; font-size: 0.95rem;}
+        .about-modal-content ul { padding-left: 1.5rem; color: var(--text-gray); margin-bottom: 1rem; font-size: 0.95rem;}
+        .about-modal-content li { margin-bottom: 0.5rem; line-height: 1.6;}
+        .about-modal-content li strong { color: var(--text-dark); }
+        .about-modal-content blockquote { font-style: italic; font-size: 1.15rem; border-left: 4px solid var(--primary-green); padding: 1rem 1.5rem; background: var(--light-green); border-radius: 0 8px 8px 0; margin: 2rem 0; color: var(--primary-green); font-weight: 600;}
+        .team-roster { font-weight: bold; color: var(--text-dark) !important; padding-left: 0.25rem; margin-top: 0.25rem;}
+        
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-wrap">
+            <a href="#" class="logo-area">
+                <div class="logo-icon">🌿</div>
+                <div class="logo-text">
+                    <h1 id="app-title" data-localize="app-title">Crop Market Price Pulse</h1>
+                    <p id="app-tagline" data-localize="app-tagline">Sell Smart. Earn More.</p>
+                </div>
+            </a>
+            
+            <nav class="main-nav">
+                <a href="#" class="active" data-localize="nav-home">Home</a>
+                <a href="#prices-section" data-localize="nav-prices">Market Prices</a>
+                <a href="#compare-section" data-localize="nav-compare">Compare Markets</a>
+                <a href="#" onclick="openAboutUs(event)" data-localize="nav-about">About Us</a>
+            </nav>
+
+            <div class="lang-container">
+                <button class="lang-btn" id="langDropdownBtn" onclick="toggleLangMenu(event)">
+                    <span id="active-language-label">English</span> ▾
+                </button>
+                <div class="lang-dropdown" id="langDropdownMenu">
+                    <button onclick="changeLanguage('en', 'English')" class="active">English</button>
+                    <button onclick="changeLanguage('hi', 'हिन्दी (Hindi)')">हिन्दी (Hindi)</button>
+                    <button onclick="changeLanguage('pa', 'ਪੰਜਾਬੀ (Punjabi)')">ਪੰਜਾਬੀ (Punjabi)</button>
+                    <button onclick="changeLanguage('gu', 'ગુજરાતી (Gujarati)')">ગુજરાતી (Gujarati)</button>
+                    <button onclick="changeLanguage('mr', 'मराठी (Marathi)')">मराठी (Marathi)</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container hero-grid">
+            <div class="hero-left">
+                <h2 id="hero-headline" data-localize="hero-headline">Know Today's Mandi Prices.<br><span>Sell Where You Earn More.</span></h2>
+                <p id="hero-subtext" data-localize="hero-subtext">Get real-time APMC mandi prices for your crop, compare nearby markets, and sell at the best price for maximum returns.</p>
+                
+                <div class="hero-features">
+                    <div class="feature">
+                        <div class="f-icon">📡</div>
+                        <div>
+                            <h4 data-localize="feat1-title">Live Prices</h4>
+                            <p data-localize="feat1-text">Real-time APMC mandi prices</p>
+                        </div>
+                    </div>
+                    <div class="feature">
+                        <div class="f-icon">⚖️</div>
+                        <div>
+                            <h4 data-localize="feat2-title">Compare</h4>
+                            <p data-localize="feat2-text">Compare prices across nearby markets</p>
+                        </div>
+                    </div>
+                    <div class="feature">
+                        <div class="f-icon">📈</div>
+                        <div>
+                            <h4 data-localize="feat3-title">Maximize Returns</h4>
+                            <p data-localize="feat3-text">Get recommended market for profit</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="document.getElementById('prices-section').scrollIntoView({behavior: 'smooth'})" class="cta-btn">
+                    📍 <span id="hero-cta-btn" data-localize="hero-cta-btn">Check Market Prices Now</span>
+                </button>
+            </div>
+            
+            <div class="hero-right">
+                <div class="hero-card" id="hero-recommendation-card">
+                    <div id="hero-card-content" class="hero-card-content">
+                        <div class="card-badge">
+                            <span class="icon-circle" id="hero-badge-icon">✓</span> 
+                            <span id="hero-badge-text" data-localize="hero-badge">Recommended Market</span>
+                        </div>
+                        <h3 id="hero-mandi-name">Indore Mandi</h3>
+                        <div class="card-price"><span id="hero-mandi-price">₹ 7,650</span> <span class="unit" data-localize="unit-quintal">/ Quintal</span></div>
+                        <p id="hero-highest-text">Highest price for your Tur (Arhar)!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <main class="container main-content" id="prices-section">
+        <div class="data-card">
+            <div class="data-header">
+                <div class="data-title">
+                    <h2 data-localize="table-heading">Live Mandi Prices</h2>
+                    <p>Last updated: Today, 10:30 AM</p>
+                </div>
+                <div class="filter-controls">
+                    <div class="filter-item">
+                        <span class="filter-icon">🌾</span>
+                        <div>
+                            <select id="crop-select" onchange="triggerRefreshSim()">
+                                <option value="tur" id="opt-tur" data-localize="crop-tur">Tur (Arhar)</option>
+                                <option value="wheat" id="opt-wheat" data-localize="crop-wheat">Wheat (Gehun)</option>
+                                <option value="soyabean" id="opt-soyabean" data-localize="crop-soyabean">Soyabean</option>
+                                <option value="chana" id="opt-chana" data-localize="crop-chana">Chana (Gram)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <span class="filter-icon">📍</span>
+                        <div>
+                            <select id="location-select" onchange="triggerRefreshSim()">
+                                <option value="default" id="opt-def-loc" data-localize="loc-default">Your Location</option>
+                                <option value="gwalior-north" id="opt-gwa-loc" data-localize="loc-gwalior">Gwalior Region</option>
+                                <option value="indore-central" id="opt-ind-loc" data-localize="loc-indore">Indore Region</option>
+                                <option value="ujjain-west" id="opt-ujj-loc" data-localize="loc-ujjain">Ujjain Region</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-mic" id="voice-btn" onclick="startVoiceRecognition()" title="Click and say a crop name">
+                        🎤
+                    </button>
+                    <button class="btn-outline" id="gps-btn" onclick="getUserLiveLocation()">
+                        🔄 <span data-localize="gps-btn">Update Location</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-overflow">
+                <div id="table-loader" class="table-spinner">
+                    <span id="loader-text" data-localize="loader-text">Fetching latest APMC pricing logs...</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th id="th-market" data-localize="th-market">Market (APMC)</th>
+                            <th id="th-distance" data-localize="th-distance">Distance</th>
+                            <th id="th-min" data-localize="th-min">Min Price (₹/Quintal)</th>
+                            <th id="th-max" data-localize="th-max">Max Price (₹/Quintal)</th>
+                            <th id="th-modal" data-localize="th-modal">Modal Price (₹/Quintal)</th>
+                            <th id="th-trend" data-localize="th-trend">Trend</th>
+                            <th id="th-reco" data-localize="th-reco">Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mandi-table-body">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div class="data-footer">
+                <div><span>🛡️</span> Source: APMC Official Data &nbsp;|&nbsp; Prices update every 30 minutes</div>
+                <div><span>ⓘ</span> Prices are indicative. Check with market before selling.</div>
+            </div>
+        </div>
+
+        <div class="map-section">
+            <div class="map-box">
+                <div class="map-header">
+                    <h3 id="map-heading" data-localize="map-heading">Interactive Map View</h3>
+                </div>
+                <div class="map-visual-container" id="map-visual-grid"></div>
+            </div>
+        </div>
+    </main>
+
+    <section id="compare-section">
+        <div class="container">
+            <div class="compare-header">
+                <h2 data-localize="comp-title">Compare Top Markets</h2>
+                <p data-localize="comp-subtitle">Side-by-side analysis for your selected crop</p>
+            </div>
+            
+            <div class="compare-grid" id="compare-grid-content">
+                </div>
+        </div>
+    </section>
+
+    <div id="aboutModal" class="about-modal-overlay" onclick="closeAboutUsOnOutsideClick(event)">
+        <div class="about-modal-content">
+            <span class="close-modal" onclick="closeAboutUs()">&times;</span>
+            <h2 data-localize="about-title">About Us</h2>
+            <p data-localize="about-intro">Welcome to crop market price pulse, where agriculture meets advanced technology. We are a team of developers and problem-solvers dedicated to transforming the future of farming through code.</p>
+            
+            <h3 data-localize="about-mission-title">Our Mission</h3>
+            <p data-localize="about-mission-text">Our mission is simple: to empower farmers with data-driven software. By translating complex agricultural data into clean, actionable code, we help optimize crop yields, reduce waste, and build a sustainable food supply chain.</p>
+            
+            <h3 data-localize="about-what-title">What We Do</h3>
+            <p data-localize="about-what-intro">We bridge the gap between the field and the digital world, leveraging modern software to solve real-world agricultural challenges:</p>
+            <ul>
+                <li><strong data-localize="about-li1-title">Smart Crop Monitoring:</strong> <span data-localize="about-li1-text">Using data analytics to track crop health, soil conditions, and growth patterns in real time.</span></li>
+                <li><strong data-localize="about-li2-title">Predictive Analytics:</strong> <span data-localize="about-li2-text">Developing algorithms to forecast weather impacts, pest risks, and harvest timelines.</span></li>
+                <li><strong data-localize="about-li3-title">Precision Farming Tools:</strong> <span data-localize="about-li3-text">Building user-friendly applications that help farmers make informed, resource-efficient decisions.</span></li>
+            </ul>
+            
+            <h3 data-localize="about-why-title">Why "Codes" Matter to "Crops"</h3>
+            <p data-localize="about-why-text">Modern farms generate massive amounts of data. We believe the right code unlocks the answers hidden within that data—whether optimizing water usage through automated scripts or using machine learning to detect plant diseases early. Our software makes farming smarter, predictable, and highly efficient.</p>
+            
+            <blockquote data-localize="about-quote">"Our goal is to write the code that helps the world grow."</blockquote>
+            
+            <h3 data-localize="about-team-title">Our Team: Vortex</h3>
+            <p data-localize="about-team-text">We are a team of freshers bringing together skills in software engineering, data science, and agricultural logic. Driven by curiosity and a shared commitment to sustainability, we came together to build technology that makes a tangible difference in the physical world.</p>
+            <p class="team-roster">Tanya Sharma</p>
+            <p class="team-roster">Ridhi Nair</p>
+            <p class="team-roster">Shalini Parihar</p>
+            <p class="team-roster">Priyanshu Singh</p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <script>
+        // Data with Actual Geographic Coordinates (Lat, Lng)
+        const marketDataset = {
+            tur: [
+                { nameEn: "Indore Mandi, Indore", nameHi: "इंदौर मंडी, इंदौर", baseDistance: 120, lat: 22.7196, lng: 75.8577, min: 7400, max: 7900, modal: 7650, trend: "+2.35%" },
+                { nameEn: "Dewas Mandi, Dewas", nameHi: "देवास मंडी, देवास", baseDistance: 85, lat: 22.9676, lng: 76.0534, min: 7100, max: 7550, modal: 7320, trend: "+1.15%" },
+                { nameEn: "Ujjain Mandi, Ujjain", nameHi: "उज्जैन मंडी, उज्जैन", baseDistance: 140, lat: 23.1765, lng: 75.7885, min: 7000, max: 7400, modal: 7180, trend: "-0.85%" },
+                { nameEn: "Shajapur Mandi, Shajapur", nameHi: "शाजापुर मंडी, शाजापुर", baseDistance: 95, lat: 23.4287, lng: 76.2758, min: 6900, max: 7300, modal: 7080, trend: "-1.25%" }
+            ],
+            wheat: [
+                { nameEn: "Gwalior Mandi, Gwalior", nameHi: "ग्वालियर मंडी, ग्वालियर", baseDistance: 10, lat: 26.2183, lng: 78.1828, min: 2500, max: 2850, modal: 2680, trend: "+1.50%" },
+                { nameEn: "Ujjain Mandi, Ujjain", nameHi: "उज्जैन मंडी, उज्जैन", baseDistance: 140, lat: 23.1765, lng: 75.7885, min: 2450, max: 2900, modal: 2720, trend: "+3.10%" },
+                { nameEn: "Indore Mandi, Indore", nameHi: "इंदौर मंडी, इंदौर", baseDistance: 120, lat: 22.7196, lng: 75.8577, min: 2300, max: 2750, modal: 2600, trend: "+1.80%" }
+            ],
+            soyabean: [
+                { nameEn: "Dewas Mandi, Dewas", nameHi: "देवास मंडी, देवास", baseDistance: 85, lat: 22.9676, lng: 76.0534, min: 4600, max: 5200, modal: 5050, trend: "+4.20%" },
+                { nameEn: "Indore Mandi, Indore", nameHi: "इंदौर मंडी, इंदौर", baseDistance: 120, lat: 22.7196, lng: 75.8577, min: 4500, max: 5100, modal: 4900, trend: "+2.50%" },
+                { nameEn: "Gwalior Mandi, Gwalior", nameHi: "ग्वालियर मंडी, ग्वालियर", baseDistance: 15, lat: 26.2183, lng: 78.1828, min: 4400, max: 5050, modal: 4850, trend: "-0.20%" }
+            ],
+            chana: [
+                { nameEn: "Indore Mandi, Indore", nameHi: "इंदौर मंडी, इंदौर", baseDistance: 120, lat: 22.7196, lng: 75.8577, min: 5800, max: 6400, modal: 6200, trend: "+1.95%" },
+                { nameEn: "Ujjain Mandi, Ujjain", nameHi: "उज्जैन मंडी, उज्जैन", baseDistance: 140, lat: 23.1765, lng: 75.7885, min: 5600, max: 6150, modal: 5950, trend: "+0.50%" },
+                { nameEn: "Gwalior Mandi, Gwalior", nameHi: "ग्वालियर मंडी, ग्वालियर", baseDistance: 5, lat: 26.2183, lng: 78.1828, min: 5900, max: 6500, modal: 6300, trend: "+2.10%" }
+            ]
+        };
+
+        // Complete Localized Dual-Language Translation Dictionary
+        const translations = {
+            en: {
+                "app-title": "Crop Market Price Pulse", "app-tagline": "Sell Smart. Earn More.", "nav-home": "Home", "nav-prices": "Market Prices", "nav-compare": "Compare Markets", "nav-about": "About Us",
+                "hero-headline": "Know Today's Mandi Prices.<br><span>Sell Where You Earn More.</span>", 
+                "hero-subtext": "Get real-time APMC mandi prices for your crop, compare nearby markets, and sell at the best price for maximum returns.", 
+                "hero-cta-btn": "Check Market Prices Now", "hero-badge": "Recommended Market", "unit-quintal": "/ Quintal", 
+                "feat1-title": "Live Prices", "feat1-text": "Real-time APMC mandi prices",
+                "feat2-title": "Compare", "feat2-text": "Compare prices across nearby markets",
+                "feat3-title": "Maximize Returns", "feat3-text": "Get recommended market for profit",
+                "map-heading": "Interactive Map View", "gps-btn": "Update Location", "table-heading": "Live Mandi Prices",
+                "crop-tur": "Tur (Arhar)", "crop-wheat": "Wheat (Gehun)", "crop-soyabean": "Soyabean", "crop-chana": "Chana (Gram)", 
+                "loc-default": "Your Location", "loc-indore": "Indore Region", "loc-ujjain": "Ujjain Region", "loc-gwalior": "Gwalior Region",
+                "th-market": "Market (APMC)", "th-distance": "Distance", "th-min": "Min Price (₹)", "th-max": "Max Price (₹)", "th-modal": "Modal Price (₹)", "th-trend": "Trend", "th-reco": "Recommendation",
+                "loader-text": "Fetching latest logs...", "txt-reco-tag": "★ Recommended", "txt-best-price": "Best Price", "dist-unit": "km",
+                "badge-alt": "Nearby Market", "subtext-alt": "Also trending in your area.",
+                "comp-title": "Compare Top Markets", "comp-subtitle": "Side-by-side analysis for your selected crop", "comp-vs": "VS",
+                "about-title": "About Us",
+                "about-intro": "Welcome to crop market price pulse, where agriculture meets advanced technology. We are a team of developers and problem-solvers dedicated to transforming the future of farming through code.",
+                "about-mission-title": "Our Mission",
+                "about-mission-text": "Our mission is simple: to empower farmers with data-driven software. By translating complex agricultural data into clean, actionable code, we help optimize crop yields, reduce waste, and build a sustainable food supply chain.",
+                "about-what-title": "What We Do",
+                "about-what-intro": "We bridge the gap between the field and the digital world, leveraging modern software to solve real-world agricultural challenges:",
+                "about-li1-title": "Smart Crop Monitoring:",
+                "about-li1-text": "Using data analytics to track crop health, soil conditions, and growth patterns in real time.",
+                "about-li2-title": "Predictive Analytics:",
+                "about-li2-text": "Developing algorithms to forecast weather impacts, pest risks, and harvest timelines.",
+                "about-li3-title": "Precision Farming Tools:",
+                "about-li3-text": "Building user-friendly applications that help farmers make informed, resource-efficient decisions.",
+                "about-why-title": "Why 'Codes' Matter to 'Crops'",
+                "about-why-text": "Modern farms generate massive amounts of data. We believe the right code unlocks the answers hidden within that data—whether optimizing water usage through automated scripts or using machine learning to detect plant diseases early. Our software makes farming smarter, predictable, and highly efficient.",
+                "about-quote": '"Our goal is to write the code that helps the world grow."',
+                "about-team-title": "Our Team: Vortex",
+                "about-team-text": "We are a team of freshers bringing together skills in software engineering, data science, and agricultural logic. Driven by curiosity and a shared commitment to sustainability, we came together to build technology that makes a tangible difference in the physical world."
+            },
+            hi: {
+                "app-title": "फसल मंडी भाव पल्स", "app-tagline": "सही बेचें। अधिक कमाएं।", "nav-home": "होम", "nav-prices": "मंडी भाव", "nav-compare": "बाजारों की तुलना", "nav-about": "हमारे बारे में",
+                "hero-headline": "आज के मंडी भाव जानें।<br><span>वहां बेचें जहां अधिक मुनाफा मिले।</span>", 
+                "hero-subtext": "अपनी फसल के लिए वास्तविक समय के APMC मंडी भाव प्राप्त करें, आस-पास के बाजारों की तुलना करें, और अधिकतम लाभ के लिए सर्वोत्तम मूल्य पर बेचें।", 
+                "hero-cta-btn": "अभी मंडी भाव देखें", "hero-badge": "अनुशंसित बाजार", "unit-quintal": "/ क्विंटल", 
+                "feat1-title": "लाइव भाव", "feat1-text": "वास्तविक समय के APMC मंडी भाव",
+                "feat2-title": "तुलना करें", "feat2-text": "आस-पास के बाजारों की तुलना करें",
+                "feat3-title": "अधिकतम लाभ", "feat3-text": "मुनाफे के लिए अनुशंसित बाजार पाएं",
+                "map-heading": "इंटरएक्टिव मैप दृश्य", "gps-btn": "लोकेशन अपडेट करें", "table-heading": "लाइव मंडी मूल्य",
+                "crop-tur": "तुअर (अरहर)", "crop-wheat": "गेहूं", "crop-soyabean": "सोयाबीन", "crop-chana": "चना", 
+                "loc-default": "आपकी लोकेशन", "loc-indore": "इन्दौर क्षेत्र", "loc-ujjain": "उज्जैन क्षेत्र", "loc-gwalior": "ग्वालियर क्षेत्र",
+                "th-market": "बाजार (APMC)", "th-distance": "दूरी", "th-min": "न्यूनतम मूल्य", "th-max": "अधिकतम मूल्य", "th-modal": "मॉडल मूल्य", "th-trend": "रुझान", "th-reco": "अनुशंसा",
+                "loader-text": "नवीनतम मूल्य प्राप्त किए जा रहे हैं...", "txt-reco-tag": "★ अनुशंसित", "txt-best-price": "सर्वश्रेष्ठ भाव", "dist-unit": "किमी",
+                "badge-alt": "नज़दीकी बाजार", "subtext-alt": "आपके क्षेत्र में भी उपलब्ध।",
+                "comp-title": "शीर्ष बाजारों की तुलना", "comp-subtitle": "आपकी चुनी हुई फसल के लिए साइड-बाय-साइड विश्लेषण", "comp-vs": "बनाम",
+                "about-title": "हमारे बारे में",
+                "about-intro": "फसल मंडी भाव पल्स में आपका स्वागत है, जहां कृषि उन्नत तकनीक से मिलती है। हम डेवलपर्स की एक टीम हैं जो कोड के माध्यम से खेती के भविष्य को बदलने के लिए समर्पित हैं।",
+                "about-mission-title": "हमारा मिशन",
+                "about-mission-text": "हमारा मिशन सरल है: डेटा-संचालित सॉफ़्टवेयर के साथ किसानों को सशक्त बनाना। जटिल कृषि डेटा को कार्रवाई योग्य कोड में बदलकर, हम फसल की पैदावार को अनुकूलित करने और कचरे को कम करने में मदद करते हैं।",
+                "about-what-title": "हम क्या करते हैं",
+                "about-what-intro": "हम आधुनिक सॉफ्टवेयर का उपयोग करके वास्तविक दुनिया की कृषि चुनौतियों को हल करते हैं:",
+                "about-li1-title": "स्मार्ट फसल निगरानी:",
+                "about-li1-text": "वास्तविक समय में फसल के स्वास्थ्य और मिट्टी की स्थिति को ट्रैक करने के लिए डेटा एनालिटिक्स का उपयोग करना।",
+                "about-li2-title": "भविष्य कहनेवाला विश्लेषण:",
+                "about-li2-text": "मौसम के प्रभाव और फसल की कटाई के समय की भविष्यवाणी करने के लिए एल्गोरिदम विकसित करना।",
+                "about-li3-title": "सटीक खेती उपकरण:",
+                "about-li3-text": "किसानों को सूचित निर्णय लेने में मदद करने वाले उपयोग में आसान एप्लिकेशन बनाना।",
+                "about-why-title": "फसलों के लिए 'कोड' क्यों मायने रखते हैं",
+                "about-why-text": "आधुनिक खेत भारी मात्रा में डेटा उत्पन्न करते हैं। हमारा सॉफ्टवेयर खेती को स्मार्ट, पूर्वानुमानित और अत्यधिक कुशल बनाता है।",
+                "about-quote": '"हमारा लक्ष्य ऐसा कोड लिखना है जो दुनिया को आगे बढ़ने में मदद करे।"',
+                "about-team-title": "हमारी टीम: भंवर (Vortex)",
+                "about-team-text": "हम सॉफ्टवेयर इंजीनियरिंग, डेटा साइंस और कृषि तर्क में कौशल को एक साथ लाने वाले फ्रेशर्स की एक टीम हैं।"
+            },
+            pa: {
+                "app-title": "ਫਸਲ ਮੰਡੀ ਭਾਅ", "app-tagline": "ਸਹੀ ਵੇਚੋ। ਵੱਧ ਕਮਾਓ।", "nav-home": "ਹੋਮ", "nav-prices": "ਮੰਡੀ ਭਾਅ", "nav-compare": "ਬਾਜ਼ਾਰਾਂ ਦੀ ਤੁਲਨਾ", "nav-about": "ਸਾਡੇ ਬਾਰੇ",
+                "hero-headline": "ਅੱਜ ਦੇ ਮੰਡੀ ਭਾਅ ਜਾਣੋ।<br><span>ਉੱਥੇ ਵੇਚੋ ਜਿੱਥੇ ਵੱਧ ਮੁਨਾਫਾ ਮਿਲੇ।</span>", 
+                "hero-subtext": "ਆਪਣੀ ਫਸਲ ਲਈ ਲਾਈਵ APMC ਮੰਡੀ ਭਾਅ ਪ੍ਰਾਪਤ ਕਰੋ, ਆਲੇ-ਦੁਆਲੇ ਦੇ ਬਾਜ਼ਾਰਾਂ ਦੀ ਤੁਲਨਾ ਕਰੋ, ਅਤੇ ਵੱਧ ਮੁਨਾਫੇ ਲਈ ਸਭ ਤੋਂ ਵਧੀਆ ਕੀਮਤ 'ਤੇ ਵੇਚੋ।", 
+                "hero-cta-btn": "ਹੁਣੇ ਮੰਡੀ ਭਾਅ ਦੇਖੋ", "hero-badge": "ਸਿਫਾਰਸ਼ ਕੀਤਾ ਬਾਜ਼ਾਰ", "unit-quintal": "/ ਕੁਇੰਟਲ", 
+                "feat1-title": "ਲਾਈਵ ਭਾਅ", "feat1-text": "ਰੀਅਲ-ਟਾਈਮ APMC ਮੰਡੀ ਭਾਅ",
+                "feat2-title": "ਤੁਲਨਾ ਕਰੋ", "feat2-text": "ਆਲੇ-ਦੁਆਲੇ ਦੇ ਬਾਜ਼ਾਰਾਂ ਦੀ ਤੁਲਨਾ ਕਰੋ",
+                "feat3-title": "ਵੱਧ ਮੁਨਾਫਾ", "feat3-text": "ਮੁਨਾਫੇ ਲਈ ਸਿਫਾਰਸ਼ੀ ਬਾਜ਼ਾਰ ਪ੍ਰਾਪਤ ਕਰੋ",
+                "map-heading": "ਲਾਈਵ ਨਕਸ਼ਾ", "gps-btn": "ਲੋਕੇਸ਼ਨ ਅਪਡੇਟ ਕਰੋ", "table-heading": "ਲਾਈਵ ਮੰਡੀ ਕੀਮਤਾਂ",
+                "crop-tur": "ਤੂਰ (ਅਰਹਰ)", "crop-wheat": "ਕਣਕ", "crop-soyabean": "ਸੋਇਆਬੀਨ", "crop-chana": "ਛੋਲੇ (ਚਣਾ)", 
+                "loc-default": "ਤੁਹਾਡੀ ਲੋਕੇਸ਼ਨ", "loc-indore": "ਇੰਦੌਰ ਖੇਤਰ", "loc-ujjain": "ਉਜੈਨ ਖੇਤਰ", "loc-gwalior": "ਗਵਾਲੀਅਰ ਖੇਤਰ",
+                "th-market": "ਬਾਜ਼ਾਰ (APMC)", "th-distance": "ਦੂਰੀ", "th-min": "ਘੱਟੋ-ਘੱਟ ਕੀਮਤ", "th-max": "ਵੱਧ ਤੋਂ ਵੱਧ ਕੀਮਤ", "th-modal": "ਔਸਤ ਕੀਮਤ", "th-trend": "ਰੁਝਾਨ", "th-reco": "ਸਿਫਾਰਸ਼",
+                "loader-text": "ਨਵੀਨਤਮ ਡਾਟਾ ਪ੍ਰਾਪਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...", "txt-reco-tag": "★ ਸਿਫਾਰਸ਼ੀ", "txt-best-price": "ਸਭ ਤੋਂ ਵਧੀਆ ਭਾਅ", "dist-unit": "ਕਿ.ਮੀ.",
+                "badge-alt": "ਨੇੜਲਾ ਬਾਜ਼ਾਰ", "subtext-alt": "ਤੁਹਾਡੇ ਖੇਤਰ ਵਿੱਚ ਉਪਲਬਧ।",
+                "comp-title": "ਚੋਟੀ ਦੇ ਬਾਜ਼ਾਰਾਂ ਦੀ ਤੁਲਨਾ", "comp-subtitle": "ਵੱਧ ਤੋਂ ਵੱਧ ਮੁਨਾਫ਼ੇ ਲਈ ਨਾਲ-ਨਾਲ ਵਿਸ਼ਲੇਸ਼ਣ", "comp-vs": "ਬਨਾਮ",
+                "about-title": "ਸਾਡੇ ਬਾਰੇ",
+                "about-intro": "ਫਸਲ ਮੰਡੀ ਭਾਅ ਪਲਸ ਵਿੱਚ ਤੁਹਾਡਾ ਸਵਾਗਤ ਹੈ, ਜਿੱਥੇ ਖੇਤੀਬਾੜੀ ਤਕਨਾਲੋਜੀ ਨਾਲ ਮਿਲਦੀ ਹੈ। ਅਸੀਂ ਡਿਵੈਲਪਰਾਂ ਦੀ ਇੱਕ ਟੀਮ ਹਾਂ ਜੋ ਕੋਡ ਰਾਹੀਂ ਖੇਤੀ ਦੇ ਭਵਿੱਖ ਨੂੰ ਬਦਲਣ ਲਈ ਸਮਰਪਿਤ ਹਾਂ।",
+                "about-mission-title": "ਸਾਡਾ ਮਿਸ਼ਨ",
+                "about-mission-text": "ਸਾਡਾ ਮਿਸ਼ਨ ਸਧਾਰਨ ਹੈ: ਡਾਟਾ-ਸੰਚਾਲਿਤ ਸਾਫਟਵੇਅਰ ਨਾਲ ਕਿਸਾਨਾਂ ਨੂੰ ਸ਼ਕਤੀਕਰਨ ਕਰਨਾ।",
+                "about-what-title": "ਅਸੀਂ ਕੀ ਕਰਦੇ ਹਾਂ",
+                "about-what-intro": "ਅਸੀਂ ਆਧੁਨਿਕ ਸਾਫਟਵੇਅਰ ਦੀ ਵਰਤੋਂ ਕਰਕੇ ਖੇਤੀਬਾੜੀ ਚੁਣੌਤੀਆਂ ਨੂੰ ਹੱਲ ਕਰਦੇ ਹਾਂ:",
+                "about-li1-title": "ਸਮਾਰਟ ਫਸਲ ਨਿਗਰਾਨੀ:",
+                "about-li1-text": "ਰੀਅਲ ਟਾਈਮ ਵਿੱਚ ਫਸਲ ਦੀ ਸਿਹਤ ਅਤੇ ਮਿੱਟੀ ਦੀ ਸਥਿਤੀ ਨੂੰ ਟਰੈਕ ਕਰਨ ਲਈ ਡਾਟਾ ਐਨਾਲਿਟਿਕਸ ਦੀ ਵਰਤੋਂ ਕਰਨਾ।",
+                "about-li2-title": "ਭਵਿੱਖਬਾਣੀ ਵਿਸ਼ਲੇਸ਼ਣ:",
+                "about-li2-text": "ਮੌਸਮ ਦੇ ਪ੍ਰਭਾਵਾਂ ਅਤੇ ਵਾਢੀ ਦੇ ਸਮੇਂ ਦੀ ਭਵਿੱਖਬਾਣੀ ਕਰਨ ਲਈ ਐਲਗੋਰਿਦਮ ਵਿਕਸਤ ਕਰਨਾ।",
+                "about-li3-title": "ਸਟੀਕ ਖੇਤੀ ਸੰਦ:",
+                "about-li3-text": "ਉਪਭੋਗਤਾ-ਅਨੁਕੂਲ ਐਪਲੀਕੇਸ਼ਨ ਬਣਾਉਣਾ ਜੋ ਕਿਸਾਨਾਂ ਨੂੰ ਫੈਸਲੇ ਲੈਣ ਵਿੱਚ ਮਦਦ ਕਰਦੇ ਹਨ।",
+                "about-why-title": "ਫਸਲਾਂ ਲਈ 'ਕੋਡ' ਕਿਉਂ ਮਹੱਤਵਪੂਰਨ ਹਨ",
+                "about-why-text": "ਆਧੁਨਿਕ ਖੇਤ ਬਹੁਤ ਸਾਰਾ ਡਾਟਾ ਪੈਦਾ ਕਰਦੇ ਹਨ। ਸਾਡਾ ਸਾਫਟਵੇਅਰ ਖੇਤੀ ਨੂੰ ਸਮਾਰਟ ਅਤੇ ਬਹੁਤ ਕੁਸ਼ਲ ਬਣਾਉਂਦਾ ਹੈ।",
+                "about-quote": '"ਸਾਡਾ ਟੀਚਾ ਅਜਿਹਾ ਕੋਡ ਲਿਖਣਾ ਹੈ ਜੋ ਦੁਨੀਆ ਨੂੰ ਵਧਣ ਵਿੱਚ ਮਦਦ ਕਰੇ।"',
+                "about-team-title": "ਸਾਡੀ ਟੀਮ: Vortex",
+                "about-team-text": "ਅਸੀਂ ਸਾਫਟਵੇਅਰ ਇੰਜੀਨੀਅਰਿੰਗ, ਡਾਟਾ ਸਾਇੰਸ, ਅਤੇ ਖੇਤੀਬਾੜੀ ਤਰਕ ਦੇ ਹੁਨਰ ਨੂੰ ਇਕੱਠਾ ਕਰਨ ਵਾਲੇ ਫਰੈਸ਼ਰਾਂ ਦੀ ਇੱਕ ਟੀਮ ਹਾਂ।"
+            },
+            gu: {
+                "app-title": "પાક બજાર ભાવ", "app-tagline": "સાચું વેચો. વધુ કમાઓ.", "nav-home": "હોમ", "nav-prices": "બજાર ભાવ", "nav-compare": "બજારોની સરખામણી", "nav-about": "અમારા વિશે",
+                "hero-headline": "આજના બજાર ભાવ જાણો.<br><span>જ્યાં વધુ નફો મળે ત્યાં વેચો.</span>", 
+                "hero-subtext": "તમારા પાક માટે રીઅલ-ટાઇમ APMC બજાર ભાવ મેળવો, આસપાસના બજારોની સરખામણી કરો, અને મહત્તમ લાભ માટે શ્રેષ્ઠ કિંમતે વેચો.", 
+                "hero-cta-btn": "બજાર ભાવ જુઓ", "hero-badge": "ભલામણ કરેલ બજાર", "unit-quintal": "/ ક્વિન્ટલ", 
+                "feat1-title": "લાઇવ ભાવ", "feat1-text": "રીઅલ-ટાઇમ APMC બજાર ભાવ",
+                "feat2-title": "સરખામણી કરો", "feat2-text": "આસપાસના બજારોમાં ભાવની સરખામણી કરો",
+                "feat3-title": "મહત્તમ નફો", "feat3-text": "નફા માટે ભલામણ કરેલ બજાર મેળવો",
+                "map-heading": "લાઇવ નકશો", "gps-btn": "લોકેશન અપડેટ કરો", "table-heading": "લાઇવ બજાર કિંમતો",
+                "crop-tur": "તુવેર", "crop-wheat": "ઘઉં", "crop-soyabean": "સોયાબીન", "crop-chana": "ચણા", 
+                "loc-default": "તમારું લોકેશન", "loc-indore": "ઇન્દોર વિસ્તાર", "loc-ujjain": "ઉજ્જૈન વિસ્તાર", "loc-gwalior": "ગ્વાલિયર વિસ્તાર",
+                "th-market": "બજાર (APMC)", "th-distance": "અંતર", "th-min": "ન્યૂનતમ કિંમત", "th-max": "મહત્તમ કિંમત", "th-modal": "સરેરાશ ભાવ", "th-trend": "વલણ", "th-reco": "ભલામણ",
+                "loader-text": "નવીનતમ ડેટા લાવી રહ્યા છીએ...", "txt-reco-tag": "★ ભલામણ કરેલ", "txt-best-price": "શ્રેષ્ઠ ભાવ", "dist-unit": "કિ.મી.",
+                "badge-alt": "નજીકનું બજાર", "subtext-alt": "તમારા વિસ્તારમાં ઉપલબ્ધ.",
+                "comp-title": "ટોચના બજારોની સરખામણી", "comp-subtitle": "તમારા પાક માટે આસપાસના બજારોનું વિશ્લેષણ", "comp-vs": "વિરુદ્ધ",
+                "about-title": "અમારા વિશે",
+                "about-intro": "પાક બજાર ભાવ પલ્સમાં તમારું સ્વાગત છે, જ્યાં કૃષિ ટેકનોલોજીને મળે છે. અમે ખેતીના ભવિષ્યને બદલવા માટે સમર્પિત વિકાસકર્તાઓની ટીમ છીએ.",
+                "about-mission-title": "અમારું મિશન",
+                "about-mission-text": "અમારું મિશન સરળ છે: ડેટા આધારિત સોફ્ટવેર સાથે ખેડૂતોને સશક્ત બનાવવું.",
+                "about-what-title": "અમે શું કરીએ છીએ",
+                "about-what-intro": "અમે આધુનિક સોફ્ટવેરનો ઉપયોગ કરીને વાસ્તવિક કૃષિ પડકારો ઉકેલીએ છીએ:",
+                "about-li1-title": "સ્માર્ટ પાક મોનિટરિંગ:",
+                "about-li1-text": "વાસ્તવિક સમયમાં પાકના આરોગ્ય અને જમીનની સ્થિતિને ટ્રૅક કરવા માટે ડેટા એનાલિટિક્સનો ઉપયોગ કરવો.",
+                "about-li2-title": "આગાહી વિશ્લેષણ:",
+                "about-li2-text": "હવામાનની અસરો અને લણણીના સમયની આગાહી કરવા માટે અલ્ગોરિધમ્સ વિકસાવવા.",
+                "about-li3-title": "ચોક્કસ ખેતી સાધનો:",
+                "about-li3-text": "ખેડૂતોને નિર્ણય લેવામાં મદદ કરતી વપરાશકર્તા-મૈત્રીપૂર્ણ એપ્લિકેશન બનાવવી.",
+                "about-why-title": "શા માટે પાકો માટે 'કોડ્સ' મહત્વપૂર્ણ છે",
+                "about-why-text": "આધુનિક ખેતરો મોટા પ્રમાણમાં ડેટા ઉત્પન્ન કરે છે. અમારું સોફ્ટવેર ખેતીને સ્માર્ટ અને કાર્યક્ષમ બનાવે છે.",
+                "about-quote": '"અમારું લક્ષ્ય એવો કોડ લખવાનું છે જે વિશ્વને વિકાસ કરવામાં મદદ કરે."',
+                "about-team-title": "અમારી ટીમ: Vortex",
+                "about-team-text": "અમે સોફ્ટવેર એન્જિનિયરિંગ, ડેટા સાયન્સ અને કૃષિ તર્કમાં કુશળતા ધરાવતા ફ્રેશર્સની ટીમ છીએ."
+            },
+            mr: {
+                "app-title": "पीक बाजार भाव", "app-tagline": "योग्य विका. अधिक कमवा.", "nav-home": "होम", "nav-prices": "बाजार भाव", "nav-compare": "बाजारांची तुलना", "nav-about": "आमच्याबद्दल",
+                "hero-headline": "आजचे बाजार भाव जाणून घ्या.<br><span>जिथे जास्त नफा मिळेल तिथे विका.</span>", 
+                "hero-subtext": "तुमच्या पिकासाठी रिअल-टाइम APMC बाजार भाव मिळवा, आसपासच्या बाजारांची तुलना करा आणि जास्तीत जास्त फायद्यासाठी सर्वोत्तम किंमतीत विका.", 
+                "hero-cta-btn": "बाजार भाव पहा", "hero-badge": "शिफारस केलेले बाजार", "unit-quintal": "/ क्विंटल", 
+                "feat1-title": "थेट भाव", "feat1-text": "रिअल-टाइम APMC बाजार भाव",
+                "feat2-title": "तुलना करा", "feat2-text": "आसपासच्या बाजारातील भावांची तुलना करा",
+                "feat3-title": "जास्तीत जास्त नफा", "feat3-text": "नफ्यासाठी शिफारस केलेले बाजार मिळवा",
+                "map-heading": "थेट नकाशा", "gps-btn": "लोकेशन अपडेट करा", "table-heading": "थेट बाजार भाव",
+                "crop-tur": "तूर", "crop-wheat": "गहू", "crop-soyabean": "सोयाबीन", "crop-chana": "हरभरा", 
+                "loc-default": "तुमचे लोकेशन", "loc-indore": "इंदूर क्षेत्र", "loc-ujjain": "उज्जैन क्षेत्र", "loc-gwalior": "ग्वाल्हेर क्षेत्र",
+                "th-market": "बाजार (APMC)", "th-distance": "अंतर", "th-min": "किमान किंमत", "th-max": "कमाल किंमत", "th-modal": "सरासरी किंमत", "th-trend": "कल", "th-reco": "शिफारस",
+                "loader-text": "नवीनतम डेटा आणत आहे...", "txt-reco-tag": "★ शिफारस", "txt-best-price": "सर्वोत्तम भाव", "dist-unit": "किमी",
+                "badge-alt": "जवळचा बाजार", "subtext-alt": "तुमच्या भागात उपलब्ध.",
+                "comp-title": "शीर्ष बाजारांची तुलना", "comp-subtitle": "तुमच्या पिकासाठी शेजारील बाजारांचे विश्लेषण", "comp-vs": "विरुद्ध",
+                "about-title": "आमच्याबद्दल",
+                "about-intro": "पीक बाजार भाव पल्समध्ये आपले स्वागत आहे, जिथे शेती तंत्रज्ञानाला भेटते. आम्ही कोडिंगद्वारे शेतीचे भविष्य बदलण्यासाठी समर्पित डेव्हलपरची एक टीम आहोत.",
+                "about-mission-title": "आमचे ध्येय",
+                "about-mission-text": "आमचे ध्येय सोपे आहे: डेटा-चालित सॉफ्टवेअरद्वारे शेतकऱ्यांना सक्षम करणे.",
+                "about-what-title": "आम्ही काय करतो",
+                "about-what-intro": "आम्ही आधुनिक सॉफ्टवेअरचा वापर करून शेतीच्या समस्या सोडवतो:",
+                "about-li1-title": "स्मार्ट पीक मॉनिटरिंग:",
+                "about-li1-text": "रिअल टाइममध्ये पिकांचे आरोग्य आणि जमिनीची स्थिती ट्रॅक करण्यासाठी डेटा विश्लेषण वापरणे.",
+                "about-li2-title": "अंदाज विश्लेषण:",
+                "about-li2-text": "हवामानाचा परिणाम आणि कापणीच्या वेळेचा अंदाज लावण्यासाठी अल्गोरिदम विकसित करणे.",
+                "about-li3-title": "अचूक शेती साधने:",
+                "about-li3-text": "शेतकऱ्यांना निर्णय घेण्यास मदत करणारे वापरकर्ता-अनुकूल ॲप्स तयार करणे.",
+                "about-why-title": "पिकांसाठी 'कोड' का महत्त्वाचे आहेत",
+                "about-why-text": "आधुनिक शेतात मोठ्या प्रमाणात डेटा तयार होतो. आमचे सॉफ्टवेअर शेतीला स्मार्ट आणि अत्यंत कार्यक्षम बनवते.",
+                "about-quote": '"आमचे ध्येय असा कोड लिहिणे आहे जे जगाला प्रगती करण्यास मदत करेल."',
+                "about-team-title": "आमची टीम: Vortex",
+                "about-team-text": "आम्ही सॉफ्टवेअर इंजिनिअरिंग, डेटा सायन्स आणि कृषी तर्कशास्त्रातील कौशल्ये एकत्र आणणाऱ्या फ्रेशर्सची टीम आहोत."
+            }
+        };
+
+        let currentLang = 'en';
+        let map;
+        let mapMarkers = [];
+        let userMarker = null;
+        
+        // Carousel specific variables
+        let heroCycleInterval;
+        let currentCycleIndex = 0;
+        let currentCycleData = [];
+
+        function initMap() {
+            map = L.map('map-visual-grid').setView([23.5, 76.5], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            }).addTo(map);
+        }
+
+        function openAboutUs(event) {
+            event.preventDefault();
+            document.getElementById('aboutModal').classList.add('show');
+        }
+
+        function closeAboutUs() {
+            document.getElementById('aboutModal').classList.remove('show');
+        }
+
+        function closeAboutUsOnOutsideClick(event) {
+            if (event.target === document.getElementById('aboutModal')) {
+                closeAboutUs();
+            }
+        }
+
+        function toggleLangMenu(event) {
+            document.getElementById('langDropdownMenu').classList.toggle('show');
+            event.stopPropagation();
+        }
+
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.lang-container')) {
+                document.getElementById('langDropdownMenu').classList.remove('show');
+            }
+        });
+
+        function changeLanguage(langKey, labelText) {
+            currentLang = langKey;
+            document.getElementById('active-language-label').innerText = labelText;
+            document.getElementById('langDropdownMenu').classList.remove('show');
+            
+            const dict = translations[currentLang] || translations['en'];
+
+            // Update all standard translatable text elements
+            document.querySelectorAll('[data-localize]').forEach(elem => {
+                const key = elem.getAttribute('data-localize');
+                if (dict[key]) { elem.innerHTML = dict[key]; }
+            });
+
+            // Update dropdown structures
+            document.getElementById('opt-tur').text = dict['crop-tur'];
+            document.getElementById('opt-wheat').text = dict['crop-wheat'];
+            document.getElementById('opt-soyabean').text = dict['crop-soyabean'];
+            document.getElementById('opt-chana').text = dict['crop-chana'];
+            
+            document.getElementById('opt-def-loc').text = dict['loc-default'];
+            document.getElementById('opt-ind-loc').text = dict['loc-indore'];
+            document.getElementById('opt-ujj-loc').text = dict['loc-ujjain'];
+            document.getElementById('opt-gwa-loc').text = dict['loc-gwalior'];
+
+            const menuBtns = document.querySelectorAll('.lang-dropdown button');
+            menuBtns.forEach(btn => {
+                if(btn.innerText.includes(labelText)) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            updateTableData();
+        }
+
+        // Handles smoothly updating the Hero Widget text content
+        function updateHeroCardUI(mandiData, index) {
+            const contentDiv = document.getElementById('hero-card-content');
+            const cropDropdown = document.getElementById('crop-select');
+            const selectedCropName = cropDropdown.options[cropDropdown.selectedIndex].text;
+            
+            const dict = translations[currentLang] || translations['en'];
+            const displayName = (currentLang !== 'en') && mandiData.nameHi ? mandiData.nameHi : mandiData.nameEn;
+            const formatPrice = (val) => `₹ ${val.toLocaleString('en-IN')}`;
+
+            // Fade Out
+            contentDiv.classList.add('fade-out');
+
+            // Wait for fade out, then swap text and fade in
+            setTimeout(() => {
+                document.getElementById('hero-mandi-name').innerText = displayName.split(',')[0];
+                document.getElementById('hero-mandi-price').innerText = formatPrice(mandiData.modal);
+                
+                if (index === 0) {
+                    document.getElementById('hero-badge-icon').innerText = "✓";
+                    document.getElementById('hero-badge-text').innerText = dict['hero-badge'];
+                    
+                    const cropTexts = {
+                        en: `Highest price for your ${selectedCropName}!`,
+                        hi: `${selectedCropName} के लिए सर्वाधिक मूल्य!`,
+                        pa: `${selectedCropName} ਲਈ ਸਭ ਤੋਂ ਵੱਧ ਕੀਮਤ!`,
+                        gu: `${selectedCropName} માટે સૌથી વધુ કિંમત!`,
+                        mr: `${selectedCropName} साठी सर्वाधिक किंमत!`
+                    };
+                    document.getElementById('hero-highest-text').innerText = cropTexts[currentLang] || cropTexts['en'];
+                } else {
+                    document.getElementById('hero-badge-icon').innerText = "📍";
+                    document.getElementById('hero-badge-text').innerText = dict['badge-alt'] || "Nearby Market";
+                    document.getElementById('hero-highest-text').innerText = dict['subtext-alt'] || "Also trending in your area.";
+                }
+
+                // Fade In
+                contentDiv.classList.remove('fade-out');
+            }, 400); // 400ms CSS transition duration
+        }
+
+        // Starts the 3-second cycle interval
+        function startHeroCarousel(data) {
+            clearInterval(heroCycleInterval);
+            currentCycleData = data;
+            currentCycleIndex = 0;
+            
+            if (data.length > 0) {
+                updateHeroCardUI(data[0], 0); // Show #1 instantly
+                
+                if(data.length > 1) {
+                    heroCycleInterval = setInterval(() => {
+                        currentCycleIndex = (currentCycleIndex + 1) % data.length;
+                        updateHeroCardUI(currentCycleData[currentCycleIndex], currentCycleIndex);
+                    }, 3000); // Trigger swap every 3 seconds
+                }
+            }
+        }
+
+        // Renders the new Compare Section side-by-side cards
+        function renderCompareSection(processedData) {
+            const compareGrid = document.getElementById('compare-grid-content');
+            compareGrid.innerHTML = '';
+            const dict = translations[currentLang] || translations['en'];
+            
+            // Take the top 2 markets for comparison
+            const topMarkets = processedData.slice(0, 2);
+            
+            if(topMarkets.length === 0) return;
+
+            topMarkets.forEach((mandi, idx) => {
+                const displayName = (currentLang !== 'en') && mandi.nameHi ? mandi.nameHi : mandi.nameEn;
+                const trendClass = mandi.trend.includes('-') ? 'trend-down' : 'trend-up';
+                const formatPrice = (val) => `₹ ${val.toLocaleString('en-IN')}`;
+                
+                const badgeHtml = idx === 0 
+                    ? `<div class="comp-badge-top">★ ${dict['txt-best-price']}</div>` 
+                    : `<div class="comp-badge-alt">📍 ${dict['badge-alt']}</div>`;
+
+                compareGrid.innerHTML += `
+                    <div class="comp-card">
+                        ${badgeHtml}
+                        <h3>${displayName.split(',')[0]}</h3>
+                        <p>${displayName.split(',')[1] || ''}</p>
+                        <div class="comp-price">${formatPrice(mandi.modal)} <span>${dict['unit-quintal']}</span></div>
+                        
+                        <div class="comp-stat"><span>${dict['th-distance']}:</span> <strong>${mandi.distance} ${dict['dist-unit']}</strong></div>
+                        <div class="comp-stat"><span>${dict['th-min']}:</span> <strong>${formatPrice(mandi.min)}</strong></div>
+                        <div class="comp-stat"><span>${dict['th-max']}:</span> <strong>${formatPrice(mandi.max)}</strong></div>
+                        <div class="comp-stat" style="border:none;"><span>${dict['th-trend']}:</span> <strong class="${trendClass}">${mandi.trend}</strong></div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderTableAndMap(data, locationFilter) {
+            const tbody = document.getElementById('mandi-table-body');
+            tbody.innerHTML = '';
+            const dict = translations[currentLang] || translations['en'];
+
+            let processedData = data.map(mandi => {
+                let currentDistance = mandi.baseDistance;
+                if(locationFilter === 'indore-central' && mandi.nameEn.includes('Indore')) currentDistance = 12;
+                if(locationFilter === 'ujjain-west' && mandi.nameEn.includes('Ujjain')) currentDistance = 8;
+                if(locationFilter === 'gwalior-north' && mandi.nameEn.includes('Gwalior')) currentDistance = 5;
+                return { ...mandi, distance: currentDistance };
+            });
+
+            processedData.sort((a, b) => b.modal - a.modal);
+            
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+            let bounds = L.latLngBounds();
+
+            processedData.forEach((mandi, index) => {
+                const isBestPrice = index === 0;
+                const displayName = (currentLang !== 'en') && mandi.nameHi ? mandi.nameHi : mandi.nameEn;
+                const isDown = mandi.trend.includes('-');
+                const trendClass = isDown ? 'trend-down' : 'trend-up';
+                const trendIcon = isDown ? '↓' : '↑';
+                const trendRaw = mandi.trend.replace(/[-+]/g, '');
+                
+                const formatPrice = (val) => `₹ ${val.toLocaleString('en-IN')}`;
+
+                const marker = L.marker([mandi.lat, mandi.lng]).addTo(map);
+                const popupContent = `<b>${displayName.split(',')[0]}</b><br>Price: ${formatPrice(mandi.modal)}`;
+                marker.bindPopup(popupContent);
+                mapMarkers.push(marker);
+                bounds.extend([mandi.lat, mandi.lng]);
+                
+                if (isBestPrice) marker.openPopup();
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>
+                            ${displayName}
+                            ${isBestPrice ? `<span class="badge-best">${dict['txt-best-price']}</span>`:''}
+                        </td>
+                        <td>${mandi.distance} ${dict['dist-unit']}</td>
+                        <td>${formatPrice(mandi.min)}</td>
+                        <td>${formatPrice(mandi.max)}</td>
+                        <td class="modal-price-col">${formatPrice(mandi.modal)}</td>
+                        <td class="${trendClass}">${trendIcon} ${trendRaw}</td>
+                        <td>${isBestPrice ? `<span class="badge-reco">${dict['txt-reco-tag']}</span>` : '—'}</td>
+                    </tr>`;
+            });
+
+            // Trigger updates to other sections based on the sorted data
+            startHeroCarousel(processedData);
+            renderCompareSection(processedData);
+
+            if(mapMarkers.length > 0 && !userMarker) {
+                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 });
+            }
+        }
+
+        function updateTableData() {
+            const selectedCrop = document.getElementById('crop-select').value;
+            const selectedLoc = document.getElementById('location-select').value;
+            renderTableAndMap(marketDataset[selectedCrop], selectedLoc);
+        }
+
+        function getUserLiveLocation() {
+            const gpsBtn = document.getElementById('gps-btn');
+            gpsBtn.style.opacity = '0.5';
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    
+                    if(lat > 25.0) { document.getElementById('location-select').value = "gwalior-north"; }
+                    else { document.getElementById('location-select').value = "indore-central"; }
+                    
+                    updateTableData();
+                    
+                    if (userMarker) { map.removeLayer(userMarker); }
+                    userMarker = L.circleMarker([lat, lng], {
+                        radius: 8, fillColor: "#2563eb", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9
+                    }).addTo(map);
+                    userMarker.bindPopup("<b>You are here</b>").openPopup();
+                    
+                    map.setView([lat, lng], 8);
+                    gpsBtn.style.opacity = '1';
+                }, (error) => {
+                    gpsBtn.style.opacity = '1';
+                    alert("Location access denied or unavailable.");
+                });
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        }
+
+        function startVoiceRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return alert("Voice recognition not supported.");
+
+            const btn = document.getElementById('voice-btn');
+            const recognition = new SpeechRecognition();
+            recognition.lang = currentLang === 'hi' ? 'hi-IN' : 'en-US';
+            
+            recognition.onstart = () => btn.classList.add('voice-btn-recording');
+            
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript.toLowerCase();
+                let recognized = false;
+
+                if (speechResult.includes('wheat') || speechResult.includes('gehun') || speechResult.includes('गेहूं')) {
+                    document.getElementById('crop-select').value = 'wheat'; recognized = true;
+                } else if (speechResult.includes('soyabean') || speechResult.includes('soya') || speechResult.includes('सोयाबीन')) {
+                    document.getElementById('crop-select').value = 'soyabean'; recognized = true;
+                } else if (speechResult.includes('chana') || speechResult.includes('gram') || speechResult.includes('चना')) {
+                    document.getElementById('crop-select').value = 'chana'; recognized = true;
+                } else if (speechResult.includes('tur') || speechResult.includes('arhar') || speechResult.includes('तुअर')) {
+                    document.getElementById('crop-select').value = 'tur'; recognized = true;
+                }
+
+                if (recognized) triggerRefreshSim();
+            };
+
+            recognition.onend = () => btn.classList.remove('voice-btn-recording');
+            recognition.start();
+        }
+
+        function triggerRefreshSim() {
+            const loader = document.getElementById('table-loader');
+            loader.classList.add('show');
+            setTimeout(() => {
+                updateTableData();
+                loader.classList.remove('show');
+            }, 500);
+        }
+
+        window.addEventListener('load', () => {
+            initMap();
+            updateTableData();
+        });
+    </script>
+</body>
+</html>
