@@ -42,4 +42,4 @@ You only need a modern web browser (Google Chrome, Microsoft Edge, Safari, or Fi
 ### Installation & Execution
 1. Clone the repository to your local machine:
 ```bash
-   git clone [https://github.com/yourusername/crop-market-price-pulse.git](https://github.com/yourusername/crop-market-price-pulse.git)
+   git clone [https://github.com/rii2007/vortex-crop-pulse.git](https://github.com/rii2007/vortex-crop-pulse.git)
